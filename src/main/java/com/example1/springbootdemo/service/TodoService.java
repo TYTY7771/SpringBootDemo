@@ -1,25 +1,23 @@
 package com.example1.springbootdemo.service;
 
 import com.example1.springbootdemo.entity.Todo;
+import com.example1.springbootdemo.exception.TodoNotFoundException;
+import com.example1.springbootdemo.repository.TodoRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
  * Todo待办事项业务逻辑服务类
- * 使用HashMap模拟数据库进行数据存储和操作
+ * 使用TodoRepository与MySQL数据库进行交互
  */
 @Service
 public class TodoService {
     
-    // 使用HashMap模拟数据库存储
-    private final Map<Long, Todo> todoDatabase = new HashMap<>();
-    
-    // 用于生成自增ID
-    private final AtomicLong idGenerator = new AtomicLong(1);
+    @Autowired
+    private TodoRepository todoRepository;
     
     /**
      * 创建新的Todo任务
@@ -32,10 +30,7 @@ public class TodoService {
         }
         
         Todo todo = new Todo(content.trim());
-        todo.setId(idGenerator.getAndIncrement());
-        todoDatabase.put(todo.getId(), todo);
-        
-        return todo;
+        return todoRepository.save(todo);
     }
     
     /**
@@ -49,11 +44,9 @@ public class TodoService {
             throw new IllegalArgumentException("任务内容不能为空");
         }
         
-        Todo todo = new Todo(content.trim(), description);
-        todo.setId(idGenerator.getAndIncrement());
-        todoDatabase.put(todo.getId(), todo);
-        
-        return todo;
+        Todo todo = new Todo(content.trim());
+        todo.setDescription(description);
+        return todoRepository.save(todo);
     }
     
     /**
@@ -65,7 +58,10 @@ public class TodoService {
      */
     public Todo createTodo(String content, String description, Integer priority) {
         Todo todo = createTodo(content, description);
-        if (priority != null && priority >= 1 && priority <= 3) {
+        if (priority != null) {
+            if (priority < 1 || priority > 3) {
+                throw new IllegalArgumentException("优先级必须在1-3之间");
+            }
             todo.setPriority(priority);
         }
         return todo;
@@ -74,13 +70,16 @@ public class TodoService {
     /**
      * 根据ID查询Todo任务
      * @param id 任务ID
-     * @return Todo对象，如果不存在则返回null
+     * @return Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo getTodoById(Long id) {
         if (id == null) {
-            return null;
+            throw new IllegalArgumentException("Todo ID不能为空");
         }
-        return todoDatabase.get(id);
+        
+        return todoRepository.findById(id)
+                .orElseThrow(() -> new TodoNotFoundException("Todo任务不存在，ID: " + id));
     }
     
     /**
@@ -88,7 +87,7 @@ public class TodoService {
      * @return 所有Todo任务的列表
      */
     public List<Todo> getAllTodos() {
-        return new ArrayList<>(todoDatabase.values());
+        return todoRepository.findAll();
     }
     
     /**
@@ -96,9 +95,7 @@ public class TodoService {
      * @return 已完成的Todo任务列表
      */
     public List<Todo> getCompletedTodos() {
-        return todoDatabase.values().stream()
-                .filter(Todo::isCompleted)
-                .collect(Collectors.toList());
+        return todoRepository.findByCompleted(true);
     }
     
     /**
@@ -106,9 +103,7 @@ public class TodoService {
      * @return 未完成的Todo任务列表
      */
     public List<Todo> getIncompleteTodos() {
-        return todoDatabase.values().stream()
-                .filter(todo -> !todo.isCompleted())
-                .collect(Collectors.toList());
+        return todoRepository.findByCompleted(false);
     }
     
     /**
@@ -120,9 +115,7 @@ public class TodoService {
         if (priority == null) {
             return new ArrayList<>();
         }
-        return todoDatabase.values().stream()
-                .filter(todo -> priority.equals(todo.getPriority()))
-                .collect(Collectors.toList());
+        return todoRepository.findByPriority(priority);
     }
     
     /**
@@ -136,7 +129,7 @@ public class TodoService {
         }
         
         String lowerKeyword = keyword.toLowerCase().trim();
-        return todoDatabase.values().stream()
+        return todoRepository.findAll().stream()
                 .filter(todo -> {
                     String content = todo.getContent() != null ? todo.getContent().toLowerCase() : "";
                     String description = todo.getDescription() != null ? todo.getDescription().toLowerCase() : "";
@@ -146,101 +139,118 @@ public class TodoService {
     }
     
     /**
+     * 通用更新Todo任务方法
+     * @param todo 要更新的Todo对象
+     * @return 更新后的Todo对象
+     */
+    public Todo updateTodo(Todo todo) {
+        if (todo == null || todo.getId() == null) {
+            throw new IllegalArgumentException("Todo对象或ID不能为空");
+        }
+        
+        // 验证Todo是否存在
+        if (!todoRepository.existsById(todo.getId())) {
+            throw new TodoNotFoundException("ID为 " + todo.getId() + " 的Todo任务不存在");
+        }
+        
+        // 验证内容
+        if (todo.getContent() != null && todo.getContent().trim().isEmpty()) {
+            throw new IllegalArgumentException("任务内容不能为空");
+        }
+        
+        // 验证优先级
+        if (todo.getPriority() != null && (todo.getPriority() < 1 || todo.getPriority() > 3)) {
+            throw new IllegalArgumentException("优先级必须在1-3之间");
+        }
+        
+        // 更新数据库中的Todo
+        return todoRepository.save(todo);
+    }
+    
+    /**
      * 更新Todo任务内容
      * @param id 任务ID
      * @param content 新的任务内容
-     * @return 更新后的Todo对象，如果任务不存在则返回null
+     * @return 更新后的Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo updateTodoContent(Long id, String content) {
         Todo todo = getTodoById(id);
-        if (todo == null) {
-            return null;
-        }
         
         if (content == null || content.trim().isEmpty()) {
             throw new IllegalArgumentException("任务内容不能为空");
         }
         
         todo.setContent(content.trim());
-        return todo;
+        return todoRepository.save(todo);
     }
     
     /**
      * 更新Todo任务描述
      * @param id 任务ID
      * @param description 新的任务描述
-     * @return 更新后的Todo对象，如果任务不存在则返回null
+     * @return 更新后的Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo updateTodoDescription(Long id, String description) {
         Todo todo = getTodoById(id);
-        if (todo == null) {
-            return null;
-        }
         
         todo.setDescription(description);
-        return todo;
+        return todoRepository.save(todo);
     }
     
     /**
      * 更新Todo任务优先级
      * @param id 任务ID
      * @param priority 新的优先级（1-3）
-     * @return 更新后的Todo对象，如果任务不存在则返回null
+     * @return 更新后的Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo updateTodoPriority(Long id, Integer priority) {
         Todo todo = getTodoById(id);
-        if (todo == null) {
-            return null;
-        }
         
         if (priority != null && (priority < 1 || priority > 3)) {
             throw new IllegalArgumentException("优先级必须在1-3之间");
         }
         
         todo.setPriority(priority);
-        return todo;
+        return todoRepository.save(todo);
     }
     
     /**
      * 标记Todo任务为已完成
      * @param id 任务ID
-     * @return 更新后的Todo对象，如果任务不存在则返回null
+     * @return 更新后的Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo markTodoAsCompleted(Long id) {
         Todo todo = getTodoById(id);
-        if (todo == null) {
-            return null;
-        }
         
         todo.markAsCompleted();
-        return todo;
+        return todoRepository.save(todo);
     }
     
     /**
      * 标记Todo任务为未完成
      * @param id 任务ID
-     * @return 更新后的Todo对象，如果任务不存在则返回null
+     * @return 更新后的Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo markTodoAsIncomplete(Long id) {
         Todo todo = getTodoById(id);
-        if (todo == null) {
-            return null;
-        }
         
         todo.markAsIncomplete();
-        return todo;
+        return todoRepository.save(todo);
     }
     
     /**
      * 切换Todo任务的完成状态
      * @param id 任务ID
-     * @return 更新后的Todo对象，如果任务不存在则返回null
+     * @return 更新后的Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo toggleTodoStatus(Long id) {
         Todo todo = getTodoById(id);
-        if (todo == null) {
-            return null;
-        }
         
         if (todo.isCompleted()) {
             todo.markAsIncomplete();
@@ -248,19 +258,23 @@ public class TodoService {
             todo.markAsCompleted();
         }
         
-        return todo;
+        return todoRepository.save(todo);
     }
     
     /**
      * 删除Todo任务
      * @param id 任务ID
-     * @return 被删除的Todo对象，如果任务不存在则返回null
+     * @return 被删除的Todo对象
+     * @throws TodoNotFoundException 如果Todo不存在
      */
     public Todo deleteTodo(Long id) {
         if (id == null) {
-            return null;
+            throw new IllegalArgumentException("任务ID不能为空");
         }
-        return todoDatabase.remove(id);
+        
+        Todo todo = getTodoById(id);
+        todoRepository.deleteById(id);
+        return todo;
     }
     
     /**
@@ -268,13 +282,14 @@ public class TodoService {
      * @return 被删除的Todo任务数量
      */
     public int deleteCompletedTodos() {
-        List<Long> completedIds = todoDatabase.values().stream()
-                .filter(Todo::isCompleted)
-                .map(Todo::getId)
-                .collect(Collectors.toList());
+        List<Todo> completedTodos = getCompletedTodos();
+        int deletedCount = completedTodos.size();
         
-        completedIds.forEach(todoDatabase::remove);
-        return completedIds.size();
+        for (Todo todo : completedTodos) {
+            todoRepository.deleteById(todo.getId());
+        }
+        
+        return deletedCount;
     }
     
     /**
@@ -282,11 +297,9 @@ public class TodoService {
      * @return 被删除的Todo任务数量
      */
     public int deleteAllTodos() {
-        int count = todoDatabase.size();
-        todoDatabase.clear();
-        // 重置ID生成器
-        idGenerator.set(1);
-        return count;
+        long count = todoRepository.count();
+        todoRepository.deleteAll();
+        return (int) count;
     }
     
     /**
@@ -294,7 +307,7 @@ public class TodoService {
      * @return 任务总数
      */
     public int getTotalCount() {
-        return todoDatabase.size();
+        return (int) todoRepository.count();
     }
     
     /**
@@ -302,9 +315,7 @@ public class TodoService {
      * @return 已完成任务数量
      */
     public int getCompletedCount() {
-        return (int) todoDatabase.values().stream()
-                .filter(Todo::isCompleted)
-                .count();
+        return getCompletedTodos().size();
     }
     
     /**
@@ -312,7 +323,7 @@ public class TodoService {
      * @return 未完成任务数量
      */
     public int getIncompleteCount() {
-        return getTotalCount() - getCompletedCount();
+        return getIncompleteTodos().size();
     }
     
     /**
@@ -321,7 +332,7 @@ public class TodoService {
      * @return 如果存在返回true，否则返回false
      */
     public boolean existsById(Long id) {
-        return id != null && todoDatabase.containsKey(id);
+        return id != null && todoRepository.existsById(id);
     }
     
     /**
@@ -335,7 +346,7 @@ public class TodoService {
             comparator = comparator.reversed();
         }
         
-        return todoDatabase.values().stream()
+        return todoRepository.findAll().stream()
                 .sorted(comparator)
                 .collect(Collectors.toList());
     }
@@ -351,7 +362,7 @@ public class TodoService {
             comparator = comparator.reversed();
         }
         
-        return todoDatabase.values().stream()
+        return todoRepository.findAll().stream()
                 .sorted(comparator)
                 .collect(Collectors.toList());
     }

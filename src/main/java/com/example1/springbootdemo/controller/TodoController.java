@@ -1,10 +1,16 @@
 package com.example1.springbootdemo.controller;
 
+import com.example1.springbootdemo.dto.TodoRequest;
+import com.example1.springbootdemo.dto.TodoUpdateRequest;
 import com.example1.springbootdemo.entity.Todo;
 import com.example1.springbootdemo.service.TodoService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -18,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/todos")
 @CrossOrigin(origins = "*") // 允许跨域请求
+@Validated
 public class TodoController {
     
     @Autowired
@@ -28,39 +35,23 @@ public class TodoController {
     //OST /api/todos
     
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createTodo(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Map<String, Object>> createTodo(@Valid @RequestBody TodoRequest request) {
         Map<String, Object> response = new HashMap<>();
         
-        try {
-            String content = (String) request.get("content");
-            String description = (String) request.get("description");
-            Integer priority = request.get("priority") != null ? 
-                Integer.valueOf(request.get("priority").toString()) : null;
-            
-            Todo todo;
-            if (description != null && priority != null) {
-                todo = todoService.createTodo(content, description, priority);
-            } else if (description != null) {
-                todo = todoService.createTodo(content, description);
-            } else {
-                todo = todoService.createTodo(content);
-            }
-            
-            response.put("success", true);
-            response.put("message", "Todo任务创建成功");
-            response.put("data", todo);
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-            
-        } catch (IllegalArgumentException e) {
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "创建Todo任务失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        Todo todo;
+        if (request.getDescription() != null && request.getPriority() != null) {
+            todo = todoService.createTodo(request.getContent(), request.getDescription(), request.getPriority());
+        } else if (request.getDescription() != null) {
+            todo = todoService.createTodo(request.getContent(), request.getDescription());
+        } else {
+            todo = todoService.createTodo(request.getContent());
         }
+        
+        response.put("success", true);
+        response.put("message", "Todo任务创建成功");
+        response.put("data", todo);
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     
     
@@ -118,29 +109,16 @@ public class TodoController {
     //GET /api/todos/{id}
     
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getTodoById(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> getTodoById(@PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
         Map<String, Object> response = new HashMap<>();
         
-        try {
-            Todo todo = todoService.getTodoById(id);
-            
-            if (todo == null) {
-                response.put("success", false);
-                response.put("message", "Todo任务不存在");
-                return ResponseEntity.notFound().build();
-            }
-            
-            response.put("success", true);
-            response.put("message", "获取Todo任务成功");
-            response.put("data", todo);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "获取Todo任务失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+        Todo todo = todoService.getTodoById(id);
+        
+        response.put("success", true);
+        response.put("message", "获取Todo任务成功");
+        response.put("data", todo);
+        
+        return ResponseEntity.ok(response);
     }
     
     
@@ -149,69 +127,36 @@ public class TodoController {
     
     @PutMapping("/{id}")
     public ResponseEntity<Map<String, Object>> updateTodo(
-            @PathVariable Long id, 
-            @RequestBody Map<String, Object> request) {
-        
+            @PathVariable @Min(value = 1, message = "ID必须大于0") Long id, 
+            @Valid @RequestBody TodoUpdateRequest request) {
         Map<String, Object> response = new HashMap<>();
         
-        try {
-            if (!todoService.existsById(id)) {
-                response.put("success", false);
-                response.put("message", "Todo任务不存在");
-                return ResponseEntity.notFound().build();
-            }
-            
-            Todo updatedTodo = null;
-            
-            // 更新内容
-            if (request.containsKey("content")) {
-                String content = (String) request.get("content");
-                updatedTodo = todoService.updateTodoContent(id, content);
-            }
-            
-            // 更新描述
-            if (request.containsKey("description")) {
-                String description = (String) request.get("description");
-                updatedTodo = todoService.updateTodoDescription(id, description);
-            }
-            
-            // 更新优先级
-            if (request.containsKey("priority")) {
-                Integer priority = request.get("priority") != null ? 
-                    Integer.valueOf(request.get("priority").toString()) : null;
-                updatedTodo = todoService.updateTodoPriority(id, priority);
-            }
-            
-            // 更新完成状态
-            if (request.containsKey("completed")) {
-                Boolean completed = (Boolean) request.get("completed");
-                if (completed != null && completed) {
-                    updatedTodo = todoService.markTodoAsCompleted(id);
-                } else {
-                    updatedTodo = todoService.markTodoAsIncomplete(id);
-                }
-            }
-            
-            // 如果没有任何更新操作，获取当前Todo
-            if (updatedTodo == null) {
-                updatedTodo = todoService.getTodoById(id);
-            }
-            
-            response.put("success", true);
-            response.put("message", "Todo任务更新成功");
-            response.put("data", updatedTodo);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (IllegalArgumentException e) {
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "更新Todo任务失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        Todo todo = todoService.getTodoById(id);
+        
+        // 更新字段
+        if (request.getContent() != null) {
+            todo.setContent(request.getContent());
         }
+        
+        if (request.getDescription() != null) {
+            todo.setDescription(request.getDescription());
+        }
+        
+        if (request.getPriority() != null) {
+            todo.setPriority(request.getPriority());
+        }
+        
+        if (request.getCompleted() != null) {
+            todo.setCompleted(request.getCompleted());
+        }
+        
+        Todo updatedTodo = todoService.updateTodo(todo);
+        
+        response.put("success", true);
+        response.put("message", "Todo任务更新成功");
+        response.put("data", updatedTodo);
+        
+        return ResponseEntity.ok(response);
     }
     
     
@@ -219,29 +164,16 @@ public class TodoController {
     //PATCH /api/todos/{id}/toggle
     
     @PatchMapping("/{id}/toggle")
-    public ResponseEntity<Map<String, Object>> toggleTodoStatus(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> toggleTodoStatus(@PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
         Map<String, Object> response = new HashMap<>();
         
-        try {
-            Todo todo = todoService.toggleTodoStatus(id);
-            
-            if (todo == null) {
-                response.put("success", false);
-                response.put("message", "Todo任务不存在");
-                return ResponseEntity.notFound().build();
-            }
-            
-            response.put("success", true);
-            response.put("message", "Todo任务状态切换成功");
-            response.put("data", todo);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "切换Todo任务状态失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+        Todo todo = todoService.toggleTodoStatus(id);
+        
+        response.put("success", true);
+        response.put("message", "Todo任务状态切换成功");
+        response.put("data", todo);
+        
+        return ResponseEntity.ok(response);
     }
     
     
@@ -249,29 +181,16 @@ public class TodoController {
     //DELETE /api/todos/{id}
     
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteTodo(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> deleteTodo(@PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
         Map<String, Object> response = new HashMap<>();
         
-        try {
-            Todo deletedTodo = todoService.deleteTodo(id);
-            
-            if (deletedTodo == null) {
-                response.put("success", false);
-                response.put("message", "Todo任务不存在");
-                return ResponseEntity.notFound().build();
-            }
-            
-            response.put("success", true);
-            response.put("message", "Todo任务删除成功");
-            response.put("data", deletedTodo);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "删除Todo任务失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+        Todo deletedTodo = todoService.deleteTodo(id);
+        
+        response.put("success", true);
+        response.put("message", "Todo任务删除成功");
+        response.put("data", deletedTodo);
+        
+        return ResponseEntity.ok(response);
     }
     
     
@@ -297,7 +216,7 @@ public class TodoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     
     //清空所有Todo任务
     //DELETE /api/todos

@@ -1,30 +1,71 @@
 package com.example1.springbootdemo.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 
 /**
- * Todo更新请求DTO类
- * 用于接收和验证更新Todo的请求参数
- * 所有字段都是可选的，只更新提供的字段
+ * Todo更新请求DTO
+ * 用于接收更新Todo任务的请求参数
  */
 public class TodoUpdateRequest {
     
-    @Size(min = 1, max = 500, message = "任务内容不能为空且不能超过500个字符")
+    /**
+     * 任务内容（可选）
+     */
+    @Size(max = 500, message = "任务内容长度不能超过500个字符")
     private String content;
     
-    @Size(max = 1000, message = "任务描述不能超过1000个字符")
+    /**
+     * 任务描述（可选）
+     */
+    @Size(max = 1000, message = "任务描述长度不能超过1000个字符")
     private String description;
     
+    /**
+     * 任务优先级（可选）
+     * 1-低优先级，2-中优先级，3-高优先级
+     */
     @Min(value = 1, message = "优先级必须在1-3之间")
     @Max(value = 3, message = "优先级必须在1-3之间")
     private Integer priority;
     
+    /**
+     * 任务完成状态（可选）
+     */
     private Boolean completed;
     
-    // 无参构造函数
-    public TodoUpdateRequest() {}
+    /**
+     * 无参构造函数
+     */
+    public TodoUpdateRequest() {
+    }
     
-    // 全参构造函数
+    /**
+     * 带参构造函数
+     * @param content 任务内容
+     */
+    public TodoUpdateRequest(String content) {
+        this.content = content;
+    }
+    
+    /**
+     * 带参构造函数
+     * @param content 任务内容
+     * @param completed 完成状态
+     */
+    public TodoUpdateRequest(String content, Boolean completed) {
+        this.content = content;
+        this.completed = completed;
+    }
+    
+    /**
+     * 完整构造函数
+     * @param content 任务内容
+     * @param description 任务描述
+     * @param priority 优先级
+     * @param completed 完成状态
+     */
     public TodoUpdateRequest(String content, String description, Integer priority, Boolean completed) {
         this.content = content;
         this.description = description;
@@ -63,11 +104,6 @@ public class TodoUpdateRequest {
     
     public void setCompleted(Boolean completed) {
         this.completed = completed;
-    }
-    
-    // 检查是否有任何字段被设置
-    public boolean hasAnyField() {
-        return content != null || description != null || priority != null || completed != null;
     }
     
     @Override

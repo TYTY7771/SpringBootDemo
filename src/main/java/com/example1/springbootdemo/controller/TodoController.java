@@ -4,6 +4,13 @@ import com.example1.springbootdemo.dto.TodoRequest;
 import com.example1.springbootdemo.dto.TodoUpdateRequest;
 import com.example1.springbootdemo.entity.Todo;
 import com.example1.springbootdemo.service.TodoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
@@ -18,9 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 
-//Todo待办事项控制器
-//提供RESTful API接口处理HTTP请求
-
+/**
+ * Todo待办事项控制器
+ * 提供RESTful API接口处理HTTP请求
+ */
+@Tag(name = "Todo管理", description = "Todo任务的增删改查操作")
 @RestController
 @RequestMapping("/api/todos")
 @CrossOrigin(origins = "*") // 允许跨域请求
@@ -31,11 +40,20 @@ public class TodoController {
     private TodoService todoService;
     
     
-    //创建新的Todo任务
-    //OST /api/todos
-    
+    /**
+     * 创建新的Todo任务
+     */
+    @Operation(summary = "创建Todo任务", description = "创建一个新的Todo任务")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "创建成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "400", description = "请求参数错误")
+    })
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createTodo(@Valid @RequestBody TodoRequest request) {
+    public ResponseEntity<Map<String, Object>> createTodo(
+            @Parameter(description = "Todo任务请求对象", required = true)
+            @Valid @RequestBody TodoRequest request) {
         Map<String, Object> response = new HashMap<>();
         
         Todo todo;
@@ -55,15 +73,26 @@ public class TodoController {
     }
     
     
-    //获取所有Todo任务
-    //GET /api/todos
-    
+    /**
+     * 获取所有Todo任务或根据条件筛选
+     */
+    @Operation(summary = "获取Todo任务列表", description = "获取所有Todo任务，支持按状态、优先级、关键词筛选和排序")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "获取成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)))
+    })
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllTodos(
+            @Parameter(description = "任务状态过滤 (completed/incomplete)", example = "completed")
             @RequestParam(required = false) String status,
+            @Parameter(description = "优先级过滤 (1-3)", example = "1")
             @RequestParam(required = false) Integer priority,
+            @Parameter(description = "关键词搜索", example = "学习")
             @RequestParam(required = false) String keyword,
+            @Parameter(description = "排序字段", example = "createTime")
             @RequestParam(required = false, defaultValue = "createTime") String sortBy,
+            @Parameter(description = "排序方向", example = "desc")
             @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
         
         Map<String, Object> response = new HashMap<>();
@@ -105,11 +134,20 @@ public class TodoController {
     }
     
     
-    //根据ID获取单个Todo任务
-    //GET /api/todos/{id}
-    
+    /**
+     * 根据ID获取单个Todo任务
+     */
+    @Operation(summary = "根据ID获取Todo任务", description = "通过任务ID获取单个Todo任务详情")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "获取成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "404", description = "任务不存在")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getTodoById(@PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
+    public ResponseEntity<Map<String, Object>> getTodoById(
+            @Parameter(description = "任务ID", required = true, example = "1")
+            @PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
         Map<String, Object> response = new HashMap<>();
         
         Todo todo = todoService.getTodoById(id);
@@ -122,12 +160,22 @@ public class TodoController {
     }
     
     
-    //更新Todo任务
-    //UT /api/todos/{id}
-    
+    /**
+     * 更新Todo任务
+     */
+    @Operation(summary = "更新Todo任务", description = "根据ID更新Todo任务的内容、描述或优先级")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "更新成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "404", description = "任务不存在"),
+            @ApiResponse(responseCode = "400", description = "请求参数错误")
+    })
     @PutMapping("/{id}")
     public ResponseEntity<Map<String, Object>> updateTodo(
-            @PathVariable @Min(value = 1, message = "ID必须大于0") Long id, 
+            @Parameter(description = "任务ID", required = true, example = "1")
+            @PathVariable @Min(value = 1, message = "ID必须大于0") Long id,
+            @Parameter(description = "Todo任务更新请求对象", required = true)
             @Valid @RequestBody TodoUpdateRequest request) {
         Map<String, Object> response = new HashMap<>();
         
@@ -160,11 +208,20 @@ public class TodoController {
     }
     
     
-    //切换Todo任务完成状态
-    //PATCH /api/todos/{id}/toggle
-    
+    /**
+     * 切换Todo任务完成状态
+     */
+    @Operation(summary = "切换任务状态", description = "切换Todo任务的完成状态（已完成↔未完成）")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "状态切换成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "404", description = "任务不存在")
+    })
     @PatchMapping("/{id}/toggle")
-    public ResponseEntity<Map<String, Object>> toggleTodoStatus(@PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
+    public ResponseEntity<Map<String, Object>> toggleTodoStatus(
+            @Parameter(description = "任务ID", required = true, example = "1")
+            @PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
         Map<String, Object> response = new HashMap<>();
         
         Todo todo = todoService.toggleTodoStatus(id);
@@ -177,11 +234,20 @@ public class TodoController {
     }
     
     
-    //删除单个Todo任务
-    //DELETE /api/todos/{id}
-    
+    /**
+     * 删除单个Todo任务
+     */
+    @Operation(summary = "删除Todo任务", description = "根据ID删除指定的Todo任务")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "删除成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "404", description = "任务不存在")
+    })
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteTodo(@PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
+    public ResponseEntity<Map<String, Object>> deleteTodo(
+            @Parameter(description = "任务ID", required = true, example = "1")
+            @PathVariable @Min(value = 1, message = "ID必须大于0") Long id) {
         Map<String, Object> response = new HashMap<>();
         
         Todo deletedTodo = todoService.deleteTodo(id);
@@ -194,9 +260,15 @@ public class TodoController {
     }
     
     
-    //删除所有已完成的Todo任务
-    //DELETE /api/todos/completed
-    
+    /**
+     * 批量删除已完成的Todo任务
+     */
+    @Operation(summary = "删除已完成任务", description = "批量删除所有已完成的Todo任务")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "删除成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)))
+    })
     @DeleteMapping("/completed")
     public ResponseEntity<Map<String, Object>> deleteCompletedTodos() {
         Map<String, Object> response = new HashMap<>();
@@ -218,9 +290,15 @@ public class TodoController {
     }
 
     
-    //清空所有Todo任务
-    //DELETE /api/todos
-    
+    /**
+     * 删除所有Todo任务
+     */
+    @Operation(summary = "删除所有任务", description = "删除所有Todo任务（危险操作）")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "删除成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)))
+    })
     @DeleteMapping
     public ResponseEntity<Map<String, Object>> deleteAllTodos() {
         Map<String, Object> response = new HashMap<>();
@@ -242,9 +320,15 @@ public class TodoController {
     }
     
     
-    //获取Todo任务统计信息
-    //GET /api/todos/stats
-    
+    /**
+     * 获取Todo任务统计信息
+     */
+    @Operation(summary = "获取任务统计", description = "获取Todo任务的统计信息，包括总数、已完成数、未完成数")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "获取成功",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)))
+    })
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getTodoStats() {
         Map<String, Object> response = new HashMap<>();

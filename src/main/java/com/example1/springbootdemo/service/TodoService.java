@@ -120,22 +120,18 @@ public class TodoService {
     
     /**
      * 根据关键词搜索Todo任务
+     * 使用JPA命名规范方法，让JPA自动生成SQL查询，提高效率
      * @param keyword 搜索关键词
-     * @return 包含关键词的Todo任务列表
+     * @return 匹配的Todo任务列表
      */
     public List<Todo> searchTodos(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
             return getAllTodos();
         }
         
-        String lowerKeyword = keyword.toLowerCase().trim();
-        return todoRepository.findAll().stream()
-                .filter(todo -> {
-                    String content = todo.getContent() != null ? todo.getContent().toLowerCase() : "";
-                    String description = todo.getDescription() != null ? todo.getDescription().toLowerCase() : "";
-                    return content.contains(lowerKeyword) || description.contains(lowerKeyword);
-                })
-                .collect(Collectors.toList());
+        String trimmedKeyword = keyword.trim();
+        // 使用JPA命名规范方法，同时搜索内容和描述
+        return todoRepository.findByContentContainingIgnoreCaseOrDescriptionContainingIgnoreCase(trimmedKeyword, trimmedKeyword);
     }
     
     /**
@@ -282,14 +278,9 @@ public class TodoService {
      * @return 被删除的Todo任务数量
      */
     public int deleteCompletedTodos() {
-        List<Todo> completedTodos = getCompletedTodos();
-        int deletedCount = completedTodos.size();
-        
-        for (Todo todo : completedTodos) {
-            todoRepository.deleteById(todo.getId());
-        }
-        
-        return deletedCount;
+        List<Todo> completedTodos = todoRepository.findByCompleted(true);
+        todoRepository.deleteAll(completedTodos);
+        return completedTodos.size();
     }
     
     /**
@@ -315,7 +306,7 @@ public class TodoService {
      * @return 已完成任务数量
      */
     public int getCompletedCount() {
-        return getCompletedTodos().size();
+        return (int) todoRepository.countByCompleted(true);
     }
     
     /**
@@ -323,7 +314,7 @@ public class TodoService {
      * @return 未完成任务数量
      */
     public int getIncompleteCount() {
-        return getIncompleteTodos().size();
+        return getTotalCount() - getCompletedCount();
     }
     
     /**
@@ -337,33 +328,29 @@ public class TodoService {
     
     /**
      * 获取按创建时间排序的Todo任务列表
+     * 使用数据库排序优化性能，避免在内存中排序大量数据
      * @param ascending 是否升序排列
      * @return 排序后的Todo任务列表
      */
     public List<Todo> getTodosSortedByCreateTime(boolean ascending) {
-        Comparator<Todo> comparator = Comparator.comparing(Todo::getCreateTime);
-        if (!ascending) {
-            comparator = comparator.reversed();
+        if (ascending) {
+            return todoRepository.findAllByOrderByCreateTimeAsc();
+        } else {
+            return todoRepository.findAllByOrderByCreateTimeDesc();
         }
-        
-        return todoRepository.findAll().stream()
-                .sorted(comparator)
-                .collect(Collectors.toList());
     }
     
     /**
      * 获取按优先级排序的Todo任务列表
+     * 使用JPA命名规范方法，让JPA自动生成SQL查询，提高效率
      * @param ascending 是否升序排列
      * @return 排序后的Todo任务列表
      */
     public List<Todo> getTodosSortedByPriority(boolean ascending) {
-        Comparator<Todo> comparator = Comparator.comparing(Todo::getPriority, Comparator.nullsLast(Comparator.naturalOrder()));
-        if (!ascending) {
-            comparator = comparator.reversed();
+        if (ascending) {
+            return todoRepository.findAllByOrderByPriorityAsc();
+        } else {
+            return todoRepository.findAllByOrderByPriorityDesc();
         }
-        
-        return todoRepository.findAll().stream()
-                .sorted(comparator)
-                .collect(Collectors.toList());
     }
 }

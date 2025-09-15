@@ -152,31 +152,26 @@ public class Todo {
         // 更新时间由@UpdateTimestamp自动管理
     }
     
-    /**
-     * 便捷方法
-     */
+    // 便捷方法
     
-    /**
-     * 标记任务为已完成
-     */
+    //标记任务为已完成
+    
     public void markAsCompleted() {
         this.completed = true;
-        // 更新时间由@UpdateTimestamp自动管理
+        this.updateTime = LocalDateTime.now();
     }
     
-    /**
-     * 标记任务为未完成
-     */
+    
+    //标记任务为未完成
+    
     public void markAsIncomplete() {
         this.completed = false;
-        // 更新时间由@UpdateTimestamp自动管理
+        this.updateTime = LocalDateTime.now();
     }
     
     
-    /**
-     * 检查任务是否已完成
-     * @return 如果任务已完成返回true，否则返回false
-     */
+    //检查任务是否已完成
+    
     public boolean isCompleted() {
         return this.completed != null && this.completed;
     }

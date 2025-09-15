@@ -34,47 +34,6 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理请求体参数校验异常
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationExceptions(
-            MethodArgumentNotValidException ex) {
-        Map<String, Object> response = new HashMap<>();
-        Map<String, String> errors = new HashMap<>();
-        
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
-        
-        response.put("success", false);
-        response.put("message", "参数校验失败");
-        response.put("errors", errors);
-        
-        return ResponseEntity.badRequest().body(response);
-    }
-    
-    /**
-     * 处理路径参数校验异常
-     */
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleConstraintViolationException(
-            ConstraintViolationException ex) {
-        Map<String, Object> response = new HashMap<>();
-        
-        String errorMessage = ex.getConstraintViolations()
-                .stream()
-                .map(ConstraintViolation::getMessage)
-                .collect(Collectors.joining(", "));
-        
-        response.put("success", false);
-        response.put("message", errorMessage);
-        
-        return ResponseEntity.badRequest().body(response);
-    }
-
-    /**
      * 处理参数验证异常
      */
     @ExceptionHandler(IllegalArgumentException.class)
